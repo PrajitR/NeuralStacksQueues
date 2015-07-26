@@ -12,17 +12,19 @@ function reverseCumsum(input)
 end
 
 function CumulativeSum:updateOutput(input)
-    if not reverse then
-       return torch.cumsum(input)
+    if not self.reverse then
+       self.output = torch.cumsum(input)
     else
-        return reverseCumsum(input)
+       self.output = reverseCumsum(input)
     end
+    return self.output
 end
 
 function CumulativeSum:updateGradInput(input, gradOutput)
-    if reverse then
-        return torch.cumsum(gradOutput)
+    if self.reverse then
+        self.gradInput = torch.cumsum(gradOutput)
     else
-        return reverseCumsum(gradOutput)
+        self.gradInput =  reverseCumsum(gradOutput)
     end
+    return self.gradInput
 end
