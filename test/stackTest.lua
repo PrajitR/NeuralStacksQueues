@@ -13,7 +13,7 @@ function tests.testStackUpdateStrength()
     local new_strength = Stack.updateStrength(prev_strength, pop, push, true)
     local updateStrengthModule = nn.gModule({prev_strength, pop, push}, {new_strength})
 
-    local s = torch.Tensor{0.4, 0.1, 0.3}
+    local s = torch.Tensor{{0.4, 0.1, 0.3}}:t()
     local d = torch.Tensor{0.6}
 
     local u = torch.Tensor{0.20}
@@ -60,7 +60,7 @@ function tests.testQueueUpdateStrength()
     local new_strength = Stack.updateStrength(prev_strength, pop, push, false)
     local updateStrengthModule = nn.gModule({prev_strength, pop, push}, {new_strength})
 
-    local s = torch.Tensor{0.4, 0.1, 0.3}
+    local s = torch.Tensor{{0.4, 0.1, 0.3}}:t()
     local d = torch.Tensor{0.6}
 
     local u = torch.Tensor{0.20}

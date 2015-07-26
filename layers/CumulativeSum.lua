@@ -6,14 +6,14 @@ function CumulativeSum:__init(reverse)
 end
 
 function reverseCumsum(input)
-    local cumsum = torch.cumsum(input)
+    local cumsum = torch.cumsum(input, 1)
     cumsum:mul(-1):add(torch.sum(input)):add(input)
     return cumsum
 end
 
 function CumulativeSum:updateOutput(input)
     if not self.reverse then
-       self.output = torch.cumsum(input)
+       self.output = torch.cumsum(input, 1)
     else
        self.output = reverseCumsum(input)
     end
