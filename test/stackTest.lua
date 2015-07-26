@@ -100,5 +100,85 @@ function tests.testQueueUpdateStrength()
                           "testQueueUpdateStrength fails with u=0.90")
 end
 
+function tests.testStackComputeRead()
+    options = {memory_size = 3}
+    local strength = nn.Identity()()
+    local memory_vectors = nn.Identity()()
+    local read = Stack.computeRead(strength, memory_vectors, true)
+    local computeReadModule = nn.gModule({strength, memory_vectors}, {read})
+
+    local mv = torch.Tensor{{1.0, 0.0, 0.0}, {0.0, 2.0, 0.0}, {0.0, 0.0, 3.0}}
+
+    local s = torch.Tensor{{0.5, 0.4, 1.0}}:t()
+    local expected = torch.Tensor{0.0, 0.0, 3.0}
+    local predicted = computeReadModule:forward({s, mv})
+    tester:assertTensorEq(expected, predicted, precision,
+                          "testStackComputeRead fails with s={0.5, 0.4, 1.0}")
+
+    s = torch.Tensor{{0.5, 0.4, 0.8}}:t()
+    expected = torch.Tensor{0.0, 0.4, 2.4}
+    predicted = computeReadModule:forward({s, mv})
+    tester:assertTensorEq(expected, predicted, precision,
+                          "testStackComputeRead fails with s={0.5, 0.4, 0.8}")
+
+    s = torch.Tensor{{0.5, 0.4, 0.6}}:t()
+    expected = torch.Tensor{0.0, 0.8, 1.8}
+    predicted = computeReadModule:forward({s, mv})
+    tester:assertTensorEq(expected, predicted, precision,
+                          "testStackComputeRead fails with s={0.5, 0.4, 0.6}")
+
+    s = torch.Tensor{{0.5, 0.3, 0.6}}:t()
+    expected = torch.Tensor{0.1, 0.6, 1.8}
+    predicted = computeReadModule:forward({s, mv})
+    tester:assertTensorEq(expected, predicted, precision,
+                          "testStackComputeRead fails with s={0.5, 0.3, 0.6}")
+
+    s = torch.Tensor{{0.3, 0.3, 0.3}}:t()
+    expected = torch.Tensor{0.3, 0.6, 0.9}
+    predicted = computeReadModule:forward({s, mv})
+    tester:assertTensorEq(expected, predicted, precision,
+                          "testStackComputeRead fails with s={0.3, 0.6, 0.9}")
+end
+
+function tests.testQueueComputeRead()
+    options = {memory_size = 3}
+    local strength = nn.Identity()()
+    local memory_vectors = nn.Identity()()
+    local read = Stack.computeRead(strength, memory_vectors, false)
+    local computeReadModule = nn.gModule({strength, memory_vectors}, {read})
+
+    local mv = torch.Tensor{{1.0, 0.0, 0.0}, {0.0, 2.0, 0.0}, {0.0, 0.0, 3.0}}
+
+    local s = torch.Tensor{{1.0, 0.4, 0.5}}:t()
+    local expected = torch.Tensor{1.0, 0.0, 0.0}
+    local predicted = computeReadModule:forward({s, mv})
+    tester:assertTensorEq(expected, predicted, precision,
+                          "testQueueComputeRead fails with s={1.0, 0.4, 0.5}")
+
+    s = torch.Tensor{{0.8, 0.3, 0.5}}:t()
+    expected = torch.Tensor{0.8, 0.4, 0.0}
+    predicted = computeReadModule:forward({s, mv})
+    tester:assertTensorEq(expected, predicted, precision,
+                          "testQueueComputeRead fails with s={0.8, 0.3, 0.5}")
+
+    s = torch.Tensor{{0.6, 0.4, 0.5}}:t()
+    expected = torch.Tensor{0.6, 0.8, 0.0}
+    predicted = computeReadModule:forward({s, mv})
+    tester:assertTensorEq(expected, predicted, precision,
+                          "testQueueComputeRead fails with s={0.6, 0.4, 0.5}")
+
+    s = torch.Tensor{{0.6, 0.3, 0.5}}:t()
+    expected = torch.Tensor{0.6, 0.6, 0.3}
+    predicted = computeReadModule:forward({s, mv})
+    tester:assertTensorEq(expected, predicted, precision,
+                          "testQueueComputeRead fails with s={0.6, 0.3, 0.5}")
+
+    s = torch.Tensor{{0.3, 0.3, 0.3}}:t()
+    expected = torch.Tensor{0.3, 0.6, 0.9}
+    predicted = computeReadModule:forward({s, mv})
+    tester:assertTensorEq(expected, predicted, precision,
+                          "testQueueComputeRead fails with s={0.3, 0.6, 0.9}")
+end
+
 tester:add(tests)
 tester:run()
