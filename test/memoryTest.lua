@@ -10,7 +10,7 @@ function tests.testStackUpdateStrength()
     local prev_strength = nn.Identity()()
     local pop = nn.Identity()()
     local push = nn.Identity()()
-    local new_strength = Memory.updateStrength(prev_strength, pop, push, true)
+    local new_strength = Memory.updateStrength(prev_strength, pop, push, true, true)
     local updateStrengthModule = nn.gModule({prev_strength, pop, push}, {new_strength})
 
     local s = torch.Tensor{{0.4, 0.1, 0.3}}:t()
@@ -57,7 +57,7 @@ function tests.testQueueUpdateStrength()
     local prev_strength = nn.Identity()()
     local pop = nn.Identity()()
     local push = nn.Identity()()
-    local new_strength = Memory.updateStrength(prev_strength, pop, push, false)
+    local new_strength = Memory.updateStrength(prev_strength, pop, push, false, true)
     local updateStrengthModule = nn.gModule({prev_strength, pop, push}, {new_strength})
 
     local s = torch.Tensor{{0.4, 0.1, 0.3}}:t()
@@ -188,7 +188,7 @@ function tests.testStack()
     local s = torch.Tensor{{0.0}}
     local v = torch.Tensor{{1.0, 0.0, 0.0}}:t()
     local u = torch.Tensor{0.0}
-    local d = torch.Tensor{0.8}
+    local d = torch.Tensor{{0.8}}
 
     local predicted_V, predicted_s, predicted_read = 
         unpack(stack:forward({V, s, v, u, d}))
@@ -207,7 +207,7 @@ function tests.testStack()
     s:resizeAs(predicted_s):copy(predicted_s)
     v = torch.Tensor{{0.0, 2.0, 0.0}}:t()
     u = torch.Tensor{0.1}
-    d = torch.Tensor{0.5}
+    d = torch.Tensor{{0.5}}
 
     predicted_V, predicted_s, predicted_read = 
         unpack(stack:forward({V, s, v, u, d}))
@@ -226,7 +226,7 @@ function tests.testStack()
     s:resizeAs(predicted_s):copy(predicted_s)
     v = torch.Tensor{{0.0, 0.0, 3.0}}:t()
     u = torch.Tensor{0.9}
-    d = torch.Tensor{0.9}
+    d = torch.Tensor{{0.9}}
 
     predicted_V, predicted_s, predicted_read = 
         unpack(stack:forward({V, s, v, u, d}))
@@ -253,7 +253,7 @@ function tests.testQueue()
     local s = torch.Tensor{{0.0}}
     local v = torch.Tensor{{1.0, 0.0, 0.0}}:t()
     local u = torch.Tensor{0.0}
-    local d = torch.Tensor{0.8}
+    local d = torch.Tensor{{0.8}}
 
     local predicted_V, predicted_s, predicted_read = 
         unpack(queue:forward({V, s, v, u, d}))
@@ -272,7 +272,7 @@ function tests.testQueue()
     s:resizeAs(predicted_s):copy(predicted_s)
     v = torch.Tensor{{0.0, 2.0, 0.0}}:t()
     u = torch.Tensor{0.1}
-    d = torch.Tensor{0.5}
+    d = torch.Tensor{{0.5}}
 
     predicted_V, predicted_s, predicted_read = 
         unpack(queue:forward({V, s, v, u, d}))
@@ -291,7 +291,7 @@ function tests.testQueue()
     s:resizeAs(predicted_s):copy(predicted_s)
     v = torch.Tensor{{0.0, 0.0, 3.0}}:t()
     u = torch.Tensor{0.8}
-    d = torch.Tensor{0.9}
+    d = torch.Tensor{{0.9}}
 
     predicted_V, predicted_s, predicted_read = 
         unpack(queue:forward({V, s, v, u, d}))
@@ -308,6 +308,68 @@ function tests.testQueue()
                          "testQueue wrong s in third update")
     tester:assertTensorEq(expected_read, predicted_read, precision,
                          "testQueue wrong read in third update")
+end
+
+function tests.testDeQue()
+--function testDeQue()
+    options = {memory_size = 3}    
+    local deque = Memory.DeQue()
+
+    local V = torch.Tensor{{0.0, 0.0, 0.0}}:t()
+    local s = torch.Tensor{{0.0}}
+    local vt = torch.Tensor{{1.0, 0.0, 0.0}}:t()
+    local vb = torch.Tensor{{0.0, 1.0, 0.0}}:t()
+    local ut = torch.Tensor{0.0}
+    local ub = torch.Tensor{0.0}
+    local dt = torch.Tensor{{0.9}}
+    local db = torch.Tensor{{0.2}}
+
+    local predicted_V, predicted_s, predicted_read_top, predicted_read_bot = 
+        unpack(deque:forward({V, s, vt, vb, ut, ub, dt, db}))
+    local expected_V = torch.Tensor{
+        {0.0, 0.0, 1.0}, 
+        {1.0, 0.0, 0.0},
+        {0.0, 0.0, 0.0}}
+    local expected_s = torch.Tensor{{0.2, 0.0, 0.9}}:t()
+    local expected_read_top = torch.Tensor{0.9, 0.1, 0.0}
+    local expected_read_bot = torch.Tensor{0.8, 0.2, 0.0}
+
+    tester:assertTensorEq(expected_V, predicted_V, precision,
+                         "testDeQue wrong V in first update")
+    tester:assertTensorEq(expected_s, predicted_s, precision,
+                         "testDeQue wrong s in first update")
+    tester:assertTensorEq(expected_read_top, predicted_read_top, precision,
+                         "testDeQue wrong read top in first update")
+    tester:assertTensorEq(expected_read_bot, predicted_read_bot, precision,
+                         "testDeQue wrong read bot in first update")
+
+    V:resizeAs(predicted_V):copy(predicted_V)
+    s:resizeAs(predicted_s):copy(predicted_s)
+    vt = torch.Tensor{{0.0, 0.0, 1.0}}:t()
+    vb = torch.Tensor{{0.0, 0.5, 0.5}}:t()
+    ut = torch.Tensor{0.6}
+    ub = torch.Tensor{0.3}
+    dt = torch.Tensor{{0.7}}
+    db = torch.Tensor{{0.5}}
+
+    predicted_V, predicted_s, predicted_read_top, predicted_read_bot = 
+        unpack(deque:forward({V, s, vt, vb, ut, ub, dt, db}))
+    expected_V = torch.Tensor{
+        {0.0, 0.0, 0.0, 1.0, 0.0},
+        {0.5, 1.0, 0.0, 0.0, 0.0},
+        {0.5, 0.0, 0.0, 0.0, 1.0}}
+    expected_s = torch.Tensor{0.5, 0.0, 0.0, 0.2, 0.7}
+    expected_read_top = torch.Tensor{0.2, 0.05, 0.75}
+    expected_read_bot = torch.Tensor{0.2, 0.25, 0.55}
+
+    tester:assertTensorEq(expected_V, predicted_V, precision,
+                         "testDeQue wrong V in second update")
+    tester:assertTensorEq(expected_s, predicted_s, precision,
+                         "testDeQue wrong s in second update")
+    tester:assertTensorEq(expected_read_top, predicted_read_top, precision,
+                         "testDeQue wrong read top in second update")
+    tester:assertTensorEq(expected_read_bot, predicted_read_bot, precision,
+                         "testDeQue wrong read bot in second update")
 end
 
 tester:add(tests)
