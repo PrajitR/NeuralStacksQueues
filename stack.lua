@@ -28,4 +28,20 @@ function Stack.computeRead(strength, memory_vectors, is_stack)
     return read
 end
 
+function Stack.createStack(is_stack)
+    local prev_memory_vectors = nn.Identity()()
+    local prev_strength = nn.Identity()()
+    local new_memory = nn.Identity()()
+    local pop = nn.Identity()()
+    local push = nn.Identity()()
+
+    local new_memory_vectors = nn.JoinTable(2)({prev_memory_vectors, new_memory})
+    local new_strength = Stack.updateStrength(prev_strength, pop, push, is_stack)
+    local read = Stack.computeRead(new_strength, new_memory_vectors, is_stack)
+    
+    return nn.gModule(
+        {prev_memory_vectors, prev_strength, new_memory, pop, push},
+        {new_memory_vectors, new_strength, read})
+end
+
 return Stack

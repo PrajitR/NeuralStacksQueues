@@ -180,5 +180,134 @@ function tests.testQueueComputeRead()
                           "testQueueComputeRead fails with s={0.3, 0.6, 0.9}")
 end
 
+function tests.testStack()
+    options = {memory_size = 3}
+    local stack = Stack.createStack(true)
+    
+    local V = torch.Tensor{{0.0, 0.0, 0.0}}:t()
+    local s = torch.Tensor{{0.0}}
+    local v = torch.Tensor{{1.0, 0.0, 0.0}}:t()
+    local u = torch.Tensor{0.0}
+    local d = torch.Tensor{0.8}
+
+    local predicted_V, predicted_s, predicted_read = 
+        unpack(stack:forward({V, s, v, u, d}))
+    local expected_V = torch.Tensor{{0.0, 1.0}, {0.0, 0.0}, {0.0, 0.0}}
+    local expected_s = torch.Tensor{{0.0, 0.8}}:t()
+    local expected_read = torch.Tensor{0.8, 0.0, 0.0}
+
+    tester:assertTensorEq(expected_V, predicted_V, precision,
+                         "testStack wrong V in first update")
+    tester:assertTensorEq(expected_s, predicted_s, precision,
+                         "testStack wrong s in first update")
+    tester:assertTensorEq(expected_read, predicted_read, precision,
+                         "testStack wrong read in first update")
+
+    V:resizeAs(predicted_V):copy(predicted_V)
+    s:resizeAs(predicted_s):copy(predicted_s)
+    v = torch.Tensor{{0.0, 2.0, 0.0}}:t()
+    u = torch.Tensor{0.1}
+    d = torch.Tensor{0.5}
+
+    predicted_V, predicted_s, predicted_read = 
+        unpack(stack:forward({V, s, v, u, d}))
+    expected_V = torch.Tensor{{0.0, 1.0, 0.0}, {0.0, 0.0, 2.0}, {0.0, 0.0, 0.0}}
+    expected_s = torch.Tensor{{0.0, 0.7, 0.5}}:t()
+    expected_read = torch.Tensor{0.5, 1.0, 0.0}
+
+    tester:assertTensorEq(expected_V, predicted_V, precision,
+                         "testStack wrong V in second update")
+    tester:assertTensorEq(expected_s, predicted_s, precision,
+                         "testStack wrong s in second update")
+    tester:assertTensorEq(expected_read, predicted_read, precision,
+                         "testStack wrong read in second update")
+
+    V:resizeAs(predicted_V):copy(predicted_V)
+    s:resizeAs(predicted_s):copy(predicted_s)
+    v = torch.Tensor{{0.0, 0.0, 3.0}}:t()
+    u = torch.Tensor{0.9}
+    d = torch.Tensor{0.9}
+
+    predicted_V, predicted_s, predicted_read = 
+        unpack(stack:forward({V, s, v, u, d}))
+    expected_V = torch.Tensor{
+        {0.0, 1.0, 0.0, 0.0},
+        {0.0, 0.0, 2.0, 0.0},
+        {0.0, 0.0, 0.0, 3.0}}
+    expected_s = torch.Tensor{{0.0, 0.3, 0.0, 0.9}}
+    expected_read = torch.Tensor{0.1, 0.0, 2.7}
+
+    tester:assertTensorEq(expected_V, predicted_V, precision,
+                         "testStack wrong V in third update")
+    tester:assertTensorEq(expected_s, predicted_s, precision,
+                         "testStack wrong s in third update")
+    tester:assertTensorEq(expected_read, predicted_read, precision,
+                         "testStack wrong read in third update")
+end
+
+function tests.testQueue()
+    options = {memory_size = 3}
+    local queue = Stack.createStack(false)
+    
+    local V = torch.Tensor{{0.0, 0.0, 0.0}}:t()
+    local s = torch.Tensor{{0.0}}
+    local v = torch.Tensor{{1.0, 0.0, 0.0}}:t()
+    local u = torch.Tensor{0.0}
+    local d = torch.Tensor{0.8}
+
+    local predicted_V, predicted_s, predicted_read = 
+        unpack(queue:forward({V, s, v, u, d}))
+    local expected_V = torch.Tensor{{0.0, 1.0}, {0.0, 0.0}, {0.0, 0.0}}
+    local expected_s = torch.Tensor{{0.0, 0.8}}:t()
+    local expected_read = torch.Tensor{0.8, 0.0, 0.0}
+
+    tester:assertTensorEq(expected_V, predicted_V, precision,
+                         "testQueue wrong V in first update")
+    tester:assertTensorEq(expected_s, predicted_s, precision,
+                         "testQueue wrong s in first update")
+    tester:assertTensorEq(expected_read, predicted_read, precision,
+                         "testQueue wrong read in first update")
+
+    V:resizeAs(predicted_V):copy(predicted_V)
+    s:resizeAs(predicted_s):copy(predicted_s)
+    v = torch.Tensor{{0.0, 2.0, 0.0}}:t()
+    u = torch.Tensor{0.1}
+    d = torch.Tensor{0.5}
+
+    predicted_V, predicted_s, predicted_read = 
+        unpack(queue:forward({V, s, v, u, d}))
+    expected_V = torch.Tensor{{0.0, 1.0, 0.0}, {0.0, 0.0, 2.0}, {0.0, 0.0, 0.0}}
+    expected_s = torch.Tensor{{0.0, 0.7, 0.5}}:t()
+    expected_read = torch.Tensor{0.7, 0.6, 0.0}
+
+    tester:assertTensorEq(expected_V, predicted_V, precision,
+                         "testQueue wrong V in second update")
+    tester:assertTensorEq(expected_s, predicted_s, precision,
+                         "testQueue wrong s in second update")
+    tester:assertTensorEq(expected_read, predicted_read, precision,
+                         "testQueue wrong read in second update")
+
+    V:resizeAs(predicted_V):copy(predicted_V)
+    s:resizeAs(predicted_s):copy(predicted_s)
+    v = torch.Tensor{{0.0, 0.0, 3.0}}:t()
+    u = torch.Tensor{0.8}
+    d = torch.Tensor{0.9}
+
+    predicted_V, predicted_s, predicted_read = 
+        unpack(queue:forward({V, s, v, u, d}))
+    expected_V = torch.Tensor{
+        {0.0, 1.0, 0.0, 0.0},
+        {0.0, 0.0, 2.0, 0.0},
+        {0.0, 0.0, 0.0, 3.0}}
+    expected_s = torch.Tensor{{0.0, 0.0, 0.4, 0.9}}
+    expected_read = torch.Tensor{0.0, 0.8, 1.8}
+
+    tester:assertTensorEq(expected_V, predicted_V, precision,
+                         "testQueue wrong V in third update")
+    tester:assertTensorEq(expected_s, predicted_s, precision,
+                         "testQueue wrong s in third update")
+    tester:assertTensorEq(expected_read, predicted_read, precision,
+                         "testQueue wrong read in third update")
+end
 tester:add(tests)
 tester:run()
