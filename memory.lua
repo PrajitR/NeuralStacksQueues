@@ -3,9 +3,9 @@ require 'nngraph'
 require 'layers/CumulativeSum'
 require 'layers/ScalarAddTable'
 
-local Stack = {}
+local Memory = {}
 
-function Stack.updateStrength(prev_strength, pop, push, is_stack)
+function Memory.updateStrength(prev_strength, pop, push, is_stack)
     local neg_cumsum = nn.MulConstant(-1)(nn.CSubTable()(
                         { nn.CumulativeSum(is_stack)(prev_strength), 
                           prev_strength }))
@@ -15,7 +15,7 @@ function Stack.updateStrength(prev_strength, pop, push, is_stack)
     return new_strength
 end
 
-function Stack.computeRead(strength, memory_vectors, is_stack)
+function Memory.computeRead(strength, memory_vectors, is_stack)
     local neg_cumsum = nn.MulConstant(-1)(nn.CSubTable()(
                         { nn.CumulativeSum(is_stack)(strength), 
                           strength }))
@@ -28,7 +28,7 @@ function Stack.computeRead(strength, memory_vectors, is_stack)
     return read
 end
 
-function Stack.createStack(is_stack)
+function Memory.oneSidedMemory(is_stack)
     local prev_memory_vectors = nn.Identity()()
     local prev_strength = nn.Identity()()
     local new_memory = nn.Identity()()
@@ -36,12 +36,20 @@ function Stack.createStack(is_stack)
     local push = nn.Identity()()
 
     local new_memory_vectors = nn.JoinTable(2)({prev_memory_vectors, new_memory})
-    local new_strength = Stack.updateStrength(prev_strength, pop, push, is_stack)
-    local read = Stack.computeRead(new_strength, new_memory_vectors, is_stack)
+    local new_strength = Memory.updateStrength(prev_strength, pop, push, is_stack)
+    local read = Memory.computeRead(new_strength, new_memory_vectors, is_stack)
     
     return nn.gModule(
         {prev_memory_vectors, prev_strength, new_memory, pop, push},
         {new_memory_vectors, new_strength, read})
 end
 
-return Stack
+function Memory.Stack()
+    return Memory.oneSidedMemory(true)
+end
+
+function Memory.Queue()
+    return Memory.oneSidedMemory(false)
+end
+
+return Memory

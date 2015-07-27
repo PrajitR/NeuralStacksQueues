@@ -1,6 +1,6 @@
 require 'nn'
 require 'nngraph'
-local Stack = require 'stack'
+local Memory = require 'Memory'
 
 local tester = torch.Tester()
 local tests = {}
@@ -10,7 +10,7 @@ function tests.testStackUpdateStrength()
     local prev_strength = nn.Identity()()
     local pop = nn.Identity()()
     local push = nn.Identity()()
-    local new_strength = Stack.updateStrength(prev_strength, pop, push, true)
+    local new_strength = Memory.updateStrength(prev_strength, pop, push, true)
     local updateStrengthModule = nn.gModule({prev_strength, pop, push}, {new_strength})
 
     local s = torch.Tensor{{0.4, 0.1, 0.3}}:t()
@@ -57,7 +57,7 @@ function tests.testQueueUpdateStrength()
     local prev_strength = nn.Identity()()
     local pop = nn.Identity()()
     local push = nn.Identity()()
-    local new_strength = Stack.updateStrength(prev_strength, pop, push, false)
+    local new_strength = Memory.updateStrength(prev_strength, pop, push, false)
     local updateStrengthModule = nn.gModule({prev_strength, pop, push}, {new_strength})
 
     local s = torch.Tensor{{0.4, 0.1, 0.3}}:t()
@@ -104,7 +104,7 @@ function tests.testStackComputeRead()
     options = {memory_size = 3}
     local strength = nn.Identity()()
     local memory_vectors = nn.Identity()()
-    local read = Stack.computeRead(strength, memory_vectors, true)
+    local read = Memory.computeRead(strength, memory_vectors, true)
     local computeReadModule = nn.gModule({strength, memory_vectors}, {read})
 
     local mv = torch.Tensor{{1.0, 0.0, 0.0}, {0.0, 2.0, 0.0}, {0.0, 0.0, 3.0}}
@@ -144,45 +144,45 @@ function tests.testQueueComputeRead()
     options = {memory_size = 3}
     local strength = nn.Identity()()
     local memory_vectors = nn.Identity()()
-    local read = Stack.computeRead(strength, memory_vectors, false)
+    local read = Memory.computeRead(strength, memory_vectors, false)
     local computeReadModule = nn.gModule({strength, memory_vectors}, {read})
 
-    local mv = torch.Tensor{{1.0, 0.0, 0.0}, {0.0, 2.0, 0.0}, {0.0, 0.0, 3.0}}
+    local V = torch.Tensor{{1.0, 0.0, 0.0}, {0.0, 2.0, 0.0}, {0.0, 0.0, 3.0}}
 
     local s = torch.Tensor{{1.0, 0.4, 0.5}}:t()
     local expected = torch.Tensor{1.0, 0.0, 0.0}
-    local predicted = computeReadModule:forward({s, mv})
+    local predicted = computeReadModule:forward({s, V})
     tester:assertTensorEq(expected, predicted, precision,
                           "testQueueComputeRead fails with s={1.0, 0.4, 0.5}")
 
     s = torch.Tensor{{0.8, 0.3, 0.5}}:t()
     expected = torch.Tensor{0.8, 0.4, 0.0}
-    predicted = computeReadModule:forward({s, mv})
+    predicted = computeReadModule:forward({s, V})
     tester:assertTensorEq(expected, predicted, precision,
                           "testQueueComputeRead fails with s={0.8, 0.3, 0.5}")
 
     s = torch.Tensor{{0.6, 0.4, 0.5}}:t()
     expected = torch.Tensor{0.6, 0.8, 0.0}
-    predicted = computeReadModule:forward({s, mv})
+    predicted = computeReadModule:forward({s, V})
     tester:assertTensorEq(expected, predicted, precision,
                           "testQueueComputeRead fails with s={0.6, 0.4, 0.5}")
 
     s = torch.Tensor{{0.6, 0.3, 0.5}}:t()
     expected = torch.Tensor{0.6, 0.6, 0.3}
-    predicted = computeReadModule:forward({s, mv})
+    predicted = computeReadModule:forward({s, V})
     tester:assertTensorEq(expected, predicted, precision,
                           "testQueueComputeRead fails with s={0.6, 0.3, 0.5}")
 
     s = torch.Tensor{{0.3, 0.3, 0.3}}:t()
     expected = torch.Tensor{0.3, 0.6, 0.9}
-    predicted = computeReadModule:forward({s, mv})
+    predicted = computeReadModule:forward({s, V})
     tester:assertTensorEq(expected, predicted, precision,
                           "testQueueComputeRead fails with s={0.3, 0.6, 0.9}")
 end
 
 function tests.testStack()
     options = {memory_size = 3}
-    local stack = Stack.createStack(true)
+    local stack = Memory.Stack()
     
     local V = torch.Tensor{{0.0, 0.0, 0.0}}:t()
     local s = torch.Tensor{{0.0}}
@@ -247,7 +247,7 @@ end
 
 function tests.testQueue()
     options = {memory_size = 3}
-    local queue = Stack.createStack(false)
+    local queue = Memory.Queue()
     
     local V = torch.Tensor{{0.0, 0.0, 0.0}}:t()
     local s = torch.Tensor{{0.0}}
@@ -309,5 +309,6 @@ function tests.testQueue()
     tester:assertTensorEq(expected_read, predicted_read, precision,
                          "testQueue wrong read in third update")
 end
+
 tester:add(tests)
 tester:run()
