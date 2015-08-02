@@ -27,11 +27,14 @@ function Memory.computeRead(strength, memory_vectors, is_stack)
                         { nn.CumulativeSum(is_stack)(strength), 
                           strength }))
     local inner_max = nn.ReLU()(nn.AddConstant(1)(neg_cumsum))
-    local coeff = nn.Min(2)(nn.JoinTable(2)({strength, inner_max}))
-    local scaled_memory = nn.CMulTable()({ 
-        memory_vectors, 
-        nn.Replicate(options.memory_size)(coeff)})
-    local read = nn.Sum(2)(scaled_memory)
+    local coeff = nn.Min(1)(nn.JoinTable(1)(
+                            { nn.View(1, options.batch_size, -1)(strength), 
+                              nn.View(1, options.batch_size, -1)(inner_max) }))
+    --local scaled_memory = nn.CMulTable()({ 
+        --memory_vectors, 
+        --nn.Replicate(options.memory_size)(coeff)})
+    --local read = nn.Sum(2)(scaled_memory)
+    local read = nn.MixtureTable(2)({coeff, memory_vectors})
     return read
 end
 
@@ -42,13 +45,17 @@ function Memory.oneSidedMemory(is_stack)
     local pop = nn.Identity()()
     local push = nn.Identity()()
 
-    local new_memory_vectors = nn.JoinTable(2)({prev_memory_vectors, new_memory})
+    local new_memory_vectors = 
+        nn.JoinTable(2)(
+            { prev_memory_vectors, 
+              nn.Reshape(1, options.memory_size, true)(new_memory) })
     local new_strength = Memory.updateStrength(prev_strength, pop, push, is_stack)
     local read = Memory.computeRead(new_strength, new_memory_vectors, is_stack)
     
     return nn.gModule(
         {prev_memory_vectors, prev_strength, new_memory, pop, push},
         {new_memory_vectors, new_strength, read})
+        --{new_memory_vectors, new_strength, push})
 end
 
 function Memory.twoSidedMemory()
@@ -62,10 +69,12 @@ function Memory.twoSidedMemory()
     local push_bot = nn.Identity()()
 
     local new_memory_vectors = nn.JoinTable(2)(
-        {memory_bot, prev_memory_vectors, memory_top})
+        {nn.Reshape(1, options.memory_size, true)(memory_bot),
+         prev_memory_vectors,
+         nn.Reshape(1, options.memory_size, true)(memory_top)})
     local strength_top = Memory.updateStrength(prev_strength, pop_top, nil, true)
     local strength_both = Memory.updateStrength(strength_top, pop_bot, nil, false)
-    local new_strength = nn.JoinTable(1)({push_bot, strength_both, push_top})
+    local new_strength = nn.JoinTable(2)({push_bot, strength_both, push_top})
     local read_top = Memory.computeRead(new_strength, new_memory_vectors, true)
     local read_bot = Memory.computeRead(new_strength, new_memory_vectors, false)
 
