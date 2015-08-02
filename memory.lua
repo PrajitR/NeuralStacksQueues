@@ -5,16 +5,17 @@ require 'layers/ScalarAddTable'
 
 local Memory = {}
 
-function Memory.updateStrength(prev_strength, pop, push, is_stack, append)
+function Memory.updateStrength(prev_strength, pop, push, is_stack)
     local neg_cumsum = nn.MulConstant(-1)(nn.CSubTable()(
                         { nn.CumulativeSum(is_stack)(prev_strength), 
                           prev_strength }))
     local inner_max = nn.ReLU()(nn.ScalarAddTable()({neg_cumsum, pop}))
     local outer_max = nn.ReLU()(nn.CSubTable()({prev_strength, inner_max}))
-    local new_strength = nil
     -- for DeQue, can only append after both passes over the vector
-    if append then 
-        new_strength = nn.JoinTable(1)({outer_max, push})
+    local should_append = push ~= nil
+    local new_strength = nil
+    if should_append then 
+        new_strength = nn.JoinTable(2)({outer_max, push})
     else
         new_strength = outer_max
     end
@@ -42,7 +43,7 @@ function Memory.oneSidedMemory(is_stack)
     local push = nn.Identity()()
 
     local new_memory_vectors = nn.JoinTable(2)({prev_memory_vectors, new_memory})
-    local new_strength = Memory.updateStrength(prev_strength, pop, push, is_stack, true)
+    local new_strength = Memory.updateStrength(prev_strength, pop, push, is_stack)
     local read = Memory.computeRead(new_strength, new_memory_vectors, is_stack)
     
     return nn.gModule(
@@ -62,8 +63,8 @@ function Memory.twoSidedMemory()
 
     local new_memory_vectors = nn.JoinTable(2)(
         {memory_bot, prev_memory_vectors, memory_top})
-    local strength_top = Memory.updateStrength(prev_strength, pop_top, push_top, true, false)
-    local strength_both = Memory.updateStrength(strength_top, pop_bot, push_bot, false, false)
+    local strength_top = Memory.updateStrength(prev_strength, pop_top, nil, true)
+    local strength_both = Memory.updateStrength(strength_top, pop_bot, nil, false)
     local new_strength = nn.JoinTable(1)({push_bot, strength_both, push_top})
     local read_top = Memory.computeRead(new_strength, new_memory_vectors, true)
     local read_bot = Memory.computeRead(new_strength, new_memory_vectors, false)
