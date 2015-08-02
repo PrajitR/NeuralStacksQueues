@@ -7,7 +7,7 @@ end
 
 function ScalarAddTable:updateOutput(input)
     local vectors, scalars = unpack(input)
-    self.output:repeatTensor(scalars, 1, vectors:size(2)):add(vectors)
+    self.output:resizeAs(vectors):copy(vectors):add(scalars:expandAs(vectors))
     return self.output
 end
 
