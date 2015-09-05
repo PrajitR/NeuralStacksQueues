@@ -35,7 +35,7 @@ function Memory.oneSidedMemory(prev_memory_vectors, prev_strength,
     local updated_strength = Memory.updateStrength(prev_strength, pop, is_stack)
     local new_strength = nn.JoinTable(2)({updated_strength, push})
     local read = Memory.computeRead(new_strength, new_memory_vectors, is_stack, opt)
-    return new_memory_vectors, new_strength, read
+    return {new_memory_vectors, new_strength, read}
 end
 
 function Memory.Stack(prev_memory_vectors, prev_strength,
@@ -64,8 +64,8 @@ function Memory.DeQue(prev_memory_vectors, prev_strength,
     local read_top = Memory.computeRead(new_strength, new_memory_vectors, true, opt)
     local read_bot = Memory.computeRead(new_strength, new_memory_vectors, false, opt)
 
-    return new_memory_vectors, new_strength, read_top, read_bot
-    end
+    return {new_memory_vectors, new_strength, read_top, read_bot}
+end
 
 function Memory.oneSidedMemoryModule(MemoryType, opt)
     local prev_memory_vectors = nn.Identity()()
@@ -74,12 +74,12 @@ function Memory.oneSidedMemoryModule(MemoryType, opt)
     local pop = nn.Identity()()
     local push = nn.Identity()()
 
-    local new_memory_vectors, new_strength, read = 
-        MemoryType(prev_memory_vectors, prev_strength, new_memory, pop, push, opt)
+    local outputs = MemoryType(prev_memory_vectors, prev_strength, 
+                               new_memory, pop, push, opt)
 
     return nn.gModule(
         {prev_memory_vectors, prev_strength, new_memory, pop, push},
-        {new_memory_vectors, new_strength, read})
+        outputs)
 end
 
 function Memory.StackModule(opt)
@@ -100,14 +100,13 @@ function Memory.DeQueModule(opt)
     local push_top = nn.Identity()()
     local push_bot = nn.Identity()()
 
-    local new_memory_vectors, new_strength, read_top, read_bot =
-        Memory.DeQue(prev_memory_vectors, prev_strength, memory_top,
+    local outputs = Memory.DeQue(prev_memory_vectors, prev_strength, memory_top,
                      memory_bot, pop_top, pop_bot, push_top, push_bot, opt)
 
     return nn.gModule(
         {prev_memory_vectors, prev_strength, memory_top, memory_bot,
             pop_top, pop_bot, push_top, push_bot},
-        {new_memory_vectors, new_strength, read_top, read_bot})
+        outputs)
 end
 
 return Memory
