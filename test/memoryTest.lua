@@ -1,6 +1,6 @@
 require 'nn'
 require 'nngraph'
-local Memory = require 'Memory'
+local Memory = require '../memory'
 
 local tester = torch.Tester()
 local tests = {}
@@ -9,46 +9,44 @@ local precision = 1e-6
 function tests.testStackUpdateStrength()
     local prev_strength = nn.Identity()()
     local pop = nn.Identity()()
-    local push = nn.Identity()()
-    local new_strength = Memory.updateStrength(prev_strength, pop, push, true)
-    local updateStrengthModule = nn.gModule({prev_strength, pop, push}, {new_strength})
+    local new_strength = Memory.updateStrength(prev_strength, pop, true)
+    local updateStrengthModule = nn.gModule({prev_strength, pop}, {new_strength})
 
     local s = torch.Tensor{{0.4, 0.1, 0.3}, {0.4, 0.1, 0.3}}
-    local d = torch.Tensor{{0.6}, {0.6}}
 
     local u = torch.Tensor{{0.20}, {0.20}}
-    local expected = torch.Tensor{{0.4, 0.1, 0.1, 0.6}, {0.4, 0.1, 0.1, 0.6}}
-    local predicted = updateStrengthModule:forward({s, u, d})
+    local expected = torch.Tensor{{0.4, 0.1, 0.1}, {0.4, 0.1, 0.1}}
+    local predicted = updateStrengthModule:forward({s, u})
     tester:assertTensorEq(expected, predicted, precision,
                           "testStackUpdateStrength fails with u=0.20")
 
     u = torch.Tensor{{0.30}, {0.30}}
-    expected = torch.Tensor{{0.4, 0.1, 0.0, 0.6}, {0.4, 0.1, 0.0, 0.6}}
-    predicted = updateStrengthModule:forward({s, u, d})
+    expected = torch.Tensor{{0.4, 0.1, 0.0}, {0.4, 0.1, 0.0}}
+    predicted = updateStrengthModule:forward({s, u})
     tester:assertTensorEq(expected, predicted, precision,
                           "testStackUpdateStrength fails with u=0.30")
 
     u = torch.Tensor{{0.35}, {0.35}}
-    expected = torch.Tensor{{0.4, 0.05, 0.0, 0.6}, {0.4, 0.05, 0.0, 0.6}}
-    predicted = updateStrengthModule:forward({s, u, d})
+    expected = torch.Tensor{{0.4, 0.05, 0.0}, {0.4, 0.05, 0.0}}
+    predicted = updateStrengthModule:forward({s, u})
     tester:assertTensorEq(expected, predicted, precision,
                           "testStackUpdateStrength fails with u=0.35")
 
     u = torch.Tensor{{0.40}, {0.40}}
-    expected = torch.Tensor{{0.4, 0.0, 0.0, 0.6}, {0.4, 0.0, 0.0, 0.6}}
-    predicted = updateStrengthModule:forward({s, u, d})
+    expected = torch.Tensor{{0.4, 0.0, 0.0}, {0.4, 0.0, 0.0}}
+    predicted = updateStrengthModule:forward({s, u})
     tester:assertTensorEq(expected, predicted, precision,
                           "testStackUpdateStrength fails with u=0.40")
 
     u = torch.Tensor{{0.50}, {0.50}}
-    expected = torch.Tensor{{0.3, 0.0, 0.0, 0.6}, {0.3, 0.0, 0.0, 0.6}}
-    predicted = updateStrengthModule:forward({s, u, d})
+    expected = torch.Tensor{{0.3, 0.0, 0.0}, {0.3, 0.0, 0.0}}
+    predicted = updateStrengthModule:forward({s, u})
     tester:assertTensorEq(expected, predicted, precision,
                           "testStackUpdateStrength fails with u=0.50")
 
     u = torch.Tensor{{0.90}, {0.90}}
-    expected = torch.Tensor{{0.0, 0.0, 0.0, 0.6}, {0.0, 0.0, 0.0, 0.6}}
-    predicted = updateStrengthModule:forward({s, u, d})
+    expected = torch.Tensor{{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}}
+    predicted = updateStrengthModule:forward({s, u})
     tester:assertTensorEq(expected, predicted, precision,
                           "testStackUpdateStrength fails with u=0.90")
 end
@@ -56,55 +54,53 @@ end
 function tests.testQueueUpdateStrength()
     local prev_strength = nn.Identity()()
     local pop = nn.Identity()()
-    local push = nn.Identity()()
-    local new_strength = Memory.updateStrength(prev_strength, pop, push, false)
-    local updateStrengthModule = nn.gModule({prev_strength, pop, push}, {new_strength})
+    local new_strength = Memory.updateStrength(prev_strength, pop, false)
+    local updateStrengthModule = nn.gModule({prev_strength, pop}, {new_strength})
 
     local s = torch.Tensor{{0.4, 0.1, 0.3}, {0.4, 0.1, 0.3}}
-    local d = torch.Tensor{{0.6}, {0.6}}
 
     local u = torch.Tensor{{0.20}, {0.20}}
-    local expected = torch.Tensor{{0.2, 0.1, 0.3, 0.6}, {0.2, 0.1, 0.3, 0.6}}
-    local predicted = updateStrengthModule:forward({s, u, d})
+    local expected = torch.Tensor{{0.2, 0.1, 0.3}, {0.2, 0.1, 0.3}}
+    local predicted = updateStrengthModule:forward({s, u})
     tester:assertTensorEq(expected, predicted, precision,
                           "testQueueUpdateStrength fails with u=0.20")
 
     u = torch.Tensor{{0.40}, {0.40}}
-    expected = torch.Tensor{{0.0, 0.1, 0.3, 0.6}, {0.0, 0.1, 0.3, 0.6}}
-    predicted = updateStrengthModule:forward({s, u, d})
+    expected = torch.Tensor{{0.0, 0.1, 0.3}, {0.0, 0.1, 0.3}}
+    predicted = updateStrengthModule:forward({s, u})
     tester:assertTensorEq(expected, predicted, precision,
                           "testQueueUpdateStrength fails with u=0.40")
 
     u = torch.Tensor{{0.45}, {0.45}}
-    expected = torch.Tensor{{0.0, 0.05, 0.3, 0.6}, {0.0, 0.05, 0.3, 0.6}}
-    predicted = updateStrengthModule:forward({s, u, d})
+    expected = torch.Tensor{{0.0, 0.05, 0.3}, {0.0, 0.05, 0.3}}
+    predicted = updateStrengthModule:forward({s, u})
     tester:assertTensorEq(expected, predicted, precision,
                           "testQueueUpdateStrength fails with u=0.45")
 
     u = torch.Tensor{{0.50}, {0.50}}
-    expected = torch.Tensor{{0.0, 0.0, 0.3, 0.6}, {0.0, 0.0, 0.3, 0.6}}
-    predicted = updateStrengthModule:forward({s, u, d})
+    expected = torch.Tensor{{0.0, 0.0, 0.3}, {0.0, 0.0, 0.3}}
+    predicted = updateStrengthModule:forward({s, u})
     tester:assertTensorEq(expected, predicted, precision,
                           "testQueueUpdateStrength fails with u=0.50")
 
     u = torch.Tensor{{0.60}, {0.60}}
-    expected = torch.Tensor{{0.0, 0.0, 0.2, 0.6}, {0.0, 0.0, 0.2, 0.6}}
-    predicted = updateStrengthModule:forward({s, u, d})
+    expected = torch.Tensor{{0.0, 0.0, 0.2}, {0.0, 0.0, 0.2}}
+    predicted = updateStrengthModule:forward({s, u})
     tester:assertTensorEq(expected, predicted, precision,
                           "testQueueUpdateStrength fails with u=0.60")
 
     u = torch.Tensor{{0.90}, {0.90}}
-    expected = torch.Tensor{{0.0, 0.0, 0.0, 0.6}, {0.0, 0.0, 0.0, 0.6}}
-    predicted = updateStrengthModule:forward({s, u, d})
+    expected = torch.Tensor{{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}}
+    predicted = updateStrengthModule:forward({s, u})
     tester:assertTensorEq(expected, predicted, precision,
                           "testQueueUpdateStrength fails with u=0.90")
 end
 
 function tests.testStackComputeRead()
-    options = {batch_size = 2}
+    opt = {batch_size = 2}
     local strength = nn.Identity()()
     local memory_vectors = nn.Identity()()
-    local read = Memory.computeRead(strength, memory_vectors, true)
+    local read = Memory.computeRead(strength, memory_vectors, true, opt)
     local computeReadModule = nn.gModule({strength, memory_vectors}, {read})
 
     local V = torch.Tensor{
@@ -143,10 +139,10 @@ function tests.testStackComputeRead()
 end
 
 function tests.testQueueComputeRead()
-    options = {batch_size = 2}
+    opt = {batch_size = 2}
     local strength = nn.Identity()()
     local memory_vectors = nn.Identity()()
-    local read = Memory.computeRead(strength, memory_vectors, false)
+    local read = Memory.computeRead(strength, memory_vectors, false, opt)
     local computeReadModule = nn.gModule({strength, memory_vectors}, {read})
 
     local V = torch.Tensor{
@@ -185,7 +181,7 @@ function tests.testQueueComputeRead()
 end
 
 function tests.testStack()
-    options = {memory_size = 3, batch_size = 2}
+    opt = {memory_size = 3, batch_size = 2}
     
     local V = torch.Tensor{
         {{0.0, 0.0, 0.0}}, 
@@ -201,7 +197,7 @@ function tests.testStack()
     local expected_s = torch.Tensor{{0.0, 0.8}, {0.0, 0.8}}
     local expected_read = torch.Tensor{{0.8, 0.0, 0.0}, {0.8, 0.0, 0.0}}
     local predicted_V, predicted_s, predicted_read = 
-        unpack(Memory.Stack():forward({V, s, v, u, d}))
+        unpack(Memory.StackModule(opt):forward({V, s, v, u, d}))
 
     tester:assertTensorEq(expected_V, predicted_V, precision,
                          "testStack wrong V in first update")
@@ -222,7 +218,7 @@ function tests.testStack()
     expected_s = torch.Tensor{{0.0, 0.7, 0.5}, {0.0, 0.7, 0.5}}
     expected_read = torch.Tensor{{0.5, 1.0, 0.0}, {0.5, 1.0, 0.0}}
     predicted_V, predicted_s, predicted_read = 
-        unpack(Memory.Stack():forward({V, s, v, u, d}))
+        unpack(Memory.StackModule(opt):forward({V, s, v, u, d}))
 
     tester:assertTensorEq(expected_V, predicted_V, precision,
                          "testStack wrong V in second update")
@@ -238,7 +234,7 @@ function tests.testStack()
     d = torch.Tensor{{0.9}, {0.9}}
 
     predicted_V, predicted_s, predicted_read = 
-        unpack(Memory.Stack():forward({V, s, v, u, d}))
+        unpack(Memory.StackModule(opt):forward({V, s, v, u, d}))
     expected_V = torch.Tensor{
         {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 2.0, 0.0}, {0.0, 0.0, 3.0}},
         {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 2.0, 0.0}, {0.0, 0.0, 3.0}}}
@@ -254,7 +250,7 @@ function tests.testStack()
 end
 
 function tests.testQueue()
-    options = {memory_size = 3, batch_size = 2}
+    opt = {memory_size = 3, batch_size = 2}
     
     local V = torch.Tensor{
         {{0.0, 0.0, 0.0}},
@@ -265,7 +261,7 @@ function tests.testQueue()
     local d = torch.Tensor{{0.8}, {0.8}}
 
     local predicted_V, predicted_s, predicted_read = 
-        unpack(Memory.Queue():forward({V, s, v, u, d}))
+        unpack(Memory.QueueModule(opt):forward({V, s, v, u, d}))
     local expected_V = torch.Tensor{
         {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}},
         {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}}}
@@ -286,7 +282,7 @@ function tests.testQueue()
     d = torch.Tensor{{0.5}, {0.5}}
 
     predicted_V, predicted_s, predicted_read = 
-        unpack(Memory.Queue():forward({V, s, v, u, d}))
+        unpack(Memory.QueueModule(opt):forward({V, s, v, u, d}))
     expected_V = torch.Tensor{
         {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 2.0, 0.0}},
         {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 2.0, 0.0}}}
@@ -307,7 +303,7 @@ function tests.testQueue()
     d = torch.Tensor{{0.9}, {0.9}}
 
     predicted_V, predicted_s, predicted_read = 
-        unpack(Memory.Queue():forward({V, s, v, u, d}))
+        unpack(Memory.QueueModule(opt):forward({V, s, v, u, d}))
     expected_V = torch.Tensor{
         {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 2.0, 0.0}, {0.0, 0.0, 3.0}},
         {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 2.0, 0.0}, {0.0, 0.0, 3.0}}}
@@ -323,7 +319,7 @@ function tests.testQueue()
 end
 
 function tests.testDeQue()
-    options = {memory_size = 3, batch_size = 2}
+    opt = {memory_size = 3, batch_size = 2}
 
     local V = torch.Tensor{
         {{0.0, 0.0, 0.0}},
@@ -337,7 +333,7 @@ function tests.testDeQue()
     local db = torch.Tensor{{0.2}, {0.2}}
 
     local predicted_V, predicted_s, predicted_read_top, predicted_read_bot = 
-        unpack(Memory.DeQue():forward({V, s, vt, vb, ut, ub, dt, db}))
+        unpack(Memory.DeQueModule(opt):forward({V, s, vt, vb, ut, ub, dt, db}))
     local expected_V = torch.Tensor{
         {{0.0, 1.0, 0.0}, {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}},
         {{0.0, 1.0, 0.0}, {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}}}
@@ -364,7 +360,7 @@ function tests.testDeQue()
     db = torch.Tensor{{0.5}, {0.5}}
 
     predicted_V, predicted_s, predicted_read_top, predicted_read_bot = 
-        unpack(Memory.DeQue():forward({V, s, vt, vb, ut, ub, dt, db}))
+        unpack(Memory.DeQueModule(opt):forward({V, s, vt, vb, ut, ub, dt, db}))
     expected_V = torch.Tensor{
         {{0.0, 0.5, 0.5}, {0.0, 1.0, 0.0}, {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 0.0, 1.0}},
         {{0.0, 0.5, 0.5}, {0.0, 1.0, 0.0}, {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 0.0, 1.0}}}
