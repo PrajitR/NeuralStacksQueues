@@ -196,7 +196,7 @@ function Controller.DeQue(opt)
     end
   end
 
-  local pred = nn.Narrow(2, m * msz * 2 + 1, vsz)(tanh_part)
+  local pred = nn.LogSoftMax()(nn.Narrow(2, m * msz * 2 + 1, vsz)(tanh_part))
   table.insert(outputs, pred)
 
   return nn.gModule(inputs, outputs)

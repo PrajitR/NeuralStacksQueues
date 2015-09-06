@@ -21,7 +21,7 @@ function tests.testGenerateSequence()
             "seq_len less than min_train_seq_len!")
         tester:assertle(seq_len, opt.max_train_seq_len, 
             "seq_len greater than max_train_seq_len!")
-        tester:assert(x:le(Task.end_token):sum() == 0, 
+        tester:assert(x:le(Task.end_token_val):sum() == 0, 
             "x has reserved fields in it!")
     end
 
@@ -31,7 +31,7 @@ function tests.testGenerateSequence()
             "seq_len less than min_test_seq_len!")
         tester:assertle(seq_len, opt.max_test_seq_len, 
             "seq_len greater than max_test_seq_len!")
-        tester:assert(x:le(Task.end_token):sum() == 0, 
+        tester:assert(x:le(Task.end_token_val):sum() == 0, 
             "x has reserved fields in it!")
     end
 
