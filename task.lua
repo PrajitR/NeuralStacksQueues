@@ -6,8 +6,7 @@ Task.end_token_val = 3
 function Task.generateSequence(make_even, is_test, opt)
     local min_len = is_test and opt.min_test_seq_len or opt.min_train_seq_len 
     local max_len = is_test and opt.max_test_seq_len or opt.max_train_seq_len 
-    --local seq_len = torch.floor(torch.uniform(min_len, max_len + 1))
-    local seq_len = 2
+    local seq_len = torch.floor(torch.uniform(min_len, max_len + 1))
     if make_even and seq_len % 2 == 1 then
         seq_len = seq_len + 1
     end
@@ -20,19 +19,19 @@ function Task.generateSequence(make_even, is_test, opt)
 end
 
 function Task.copy(x, index)
-    return x[{{}, index}]
+    return x:select(2, index)
 end
 
 function Task.reverse(x, index)
     local seq_len = x:size(2)
-    return x[{{}, seq_len - index + 1}]
+    return x:select(2, seq_len - index + 1)
 end
 
 function Task.bigramFlip(x, index)
     if index % 2 == 1 then
-        return x[{{}, index + 1}]
+        return x:select(2, index + 1)
     else
-        return x[{{}, index - 1}]
+        return x:select(2, index - 1)
     end
 end
 

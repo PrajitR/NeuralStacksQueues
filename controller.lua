@@ -35,6 +35,7 @@ function Controller.oneSidedMemory(opt)
   local m = opt.num_memory_modules
   local msz = opt.memory_size
   local rsz = opt.rnn_size
+  local esz = opt.embedding_size
   local vsz = opt.vocab_size
 
   -- there will be 1 + 2 * n + 3 * m inputs
@@ -60,14 +61,13 @@ function Controller.oneSidedMemory(opt)
 
     -- the input to this layer
     if L == 1 then 
-      local embedding = nn.LookupTable(vsz, rsz)(inputs[1])
-      local controller_inputs = { embedding } 
+      local controller_inputs = { inputs[1] } 
       -- collect all reads from previous step
       for s = 1, m do
         table.insert(controller_inputs, inputs[2 * n + 1 + s * 3])
       end
       x = nn.JoinTable(2)(controller_inputs)
-      input_size_L = rsz + m * msz
+      input_size_L = esz + m * msz
     else 
       x = outputs[(L - 1) * 2] 
       if dropout > 0 then x = nn.Dropout(dropout)(x) end -- apply dropout, if any
@@ -120,6 +120,7 @@ function Controller.DeQue(opt)
   local m = opt.num_memory_modules
   local msz = opt.memory_size
   local rsz = opt.rnn_size
+  local esz = opt.embedding_size
   local vsz = opt.vocab_size
 
   -- there will be 1 + 2 * n + 3 * m inputs
@@ -146,15 +147,14 @@ function Controller.DeQue(opt)
 
     -- the input to this layer
     if L == 1 then 
-      local embedding = nn.LookupTable(vsz, rsz)(inputs[1])
-      local controller_inputs = { embedding } 
+      local controller_inputs = { inputs[1] } 
       -- collect all reads from previous step
       for s = 1, m do
         table.insert(controller_inputs, inputs[2 * n + 1 + s * 4 - 1]) -- read_top
         table.insert(controller_inputs, inputs[2 * n + 1 + s * 4]) -- read_bot
       end
       x = nn.JoinTable(2)(controller_inputs)
-      input_size_L = rsz + m * msz * 2
+      input_size_L = esz + m * msz * 2
     else 
       x = outputs[(L - 1) * 2] 
       if dropout > 0 then x = nn.Dropout(dropout)(x) end -- apply dropout, if any

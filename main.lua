@@ -8,6 +8,7 @@ local opt = {
     num_memory_modules = 3,
     vocab_size = 20,
     rnn_size = 3,
+    embedding_size = 3,
     memory_size = 2,
     batch_size = 2,
     memory_types = "sqs",
@@ -26,15 +27,20 @@ else
     protos.rnn = Controller.oneSidedMemory(opt)
 end
 protos.criterion = nn.ClassNLLCriterion()
-Utils.gpu(protos.rnn, opt)
-Utils.gpu(protos.criterion, opt)
+protos.enc_dict = nn.LookupTable(opt.vocab_size, opt.embedding_size)
+protos.dec_dict = nn.LookupTable(opt.vocab_size, opt.embedding_size)
+for _, proto in pairs(protos) do
+    Utils.gpu(proto, opt)
+end
 
-local params, grad_params = Utils.combineAllParameters(protos.rnn)
+local params, grad_params = Utils.combineAllParameters(
+    protos.rnn, protos.enc_dict, protos.dec_dict)
 
 local clones = {}
-for name, proto in pairs(protos) do
-    clones[name] = Utils.cloneManyTimes(proto, 2 * opt.max_test_seq_len + 2) 
-end
+clones.rnn = Utils.cloneManyTimes(protos.rnn, 2 * opt.max_test_seq_len + 2)
+clones.criterion = Utils.cloneManyTimes(protos.criterion, opt.max_test_seq_len + 1)
+clones.enc_dict = Utils.cloneManyTimes(protos.enc_dict, opt.max_test_seq_len + 1)
+clones.dec_dict = Utils.cloneManyTimes(protos.dec_dict, opt.max_test_seq_len + 1)
 
 local init_state = {}
 for i = 1, opt.num_lstm_layers do
@@ -50,44 +56,76 @@ for i = 1, opt.num_memory_modules do
     end
 end
 
-local function forward(x, seq_len)
+local function determineInput(inp, prediction, get_argmax)
+    if prediction == nil or not get_argmax then
+        return inp
+    else 
+        local _, argmax = prediction:max(2)
+        return argmax:double():select(2, 1)
+    end
+end
+
+local function correctMetric(no_wrongs, num_correct, y, prediction)
+    local _, argmax = prediction:max(2)
+    no_wrongs:cmul(y:eq(argmax:double()))
+    num_correct:add(no_wrongs:double())
+end
+
+local function forward(x, seq_len, get_argmax)
     local rnn_states = {[0] = init_state} -- The rnn state going into timestep t.
-    local predictions = {}
+    local embeddings = {}
 
     -- Feed in input sequence, including start token.
     for t = 0, seq_len do
-        local inp = t == 0 and Task.startToken(opt) or x[{{}, t}]
-        output = clones.rnn[t]:forward{inp, unpack(rnn_states[t])}
+        local inp = t == 0 and Task.startToken(opt) or x:select(2, t)
+        embeddings[t] = clones.enc_dict[t]:forward(inp)
+        output = clones.rnn[t]:forward{embeddings[t], unpack(rnn_states[t])}
         rnn_states[t + 1] = Utils.spliceList(output, 1, #init_state)
     end
 
     -- Feed in output sequence, including separation and end token.
+    local dec_inputs = {}
+    local predictions = {}
     local sep_index = seq_len + 1
     local loss = 0
+    -- Additional metrics for coarse and fine scores if testing.
+    local no_wrongs, num_correct
+    if get_argmax then
+        no_wrongs = torch.ByteTensor(opt.batch_size):fill(1)
+        num_correct = torch.zeros(opt.batch_size)
+    end
+ 
     for t = 0, seq_len do
         local inp = t == 0 and Task.sepToken(opt) or Task.copy(x, t)
-        output = clones.rnn[t + sep_index]:forward{inp, unpack(rnn_states[t + sep_index])}
+        dec_inputs[t] = determineInput(inp, predictions[t - 1], get_argmax)
+        embeddings[t + seq_len] = clones.dec_dict[t]:forward(dec_inputs[t])
+        output = clones.rnn[t + sep_index]:forward{
+                embeddings[t + seq_len], unpack(rnn_states[t + sep_index]) }
+
         rnn_states[t + sep_index + 1] = Utils.spliceList(output, 1, #init_state)
         predictions[t] = output[#output]
         local y = t == seq_len and Task.endToken(opt) or Task.copy(x, t + 1)
-        loss = loss + clones.criterion[t + sep_index]:forward(predictions[t], y)
+        loss = loss + clones.criterion[t]:forward(predictions[t], y)
+        if get_argmax then
+            correctMetric(no_wrongs, num_correct, y, predictions[t])
+        end
     end
 
-    return rnn_states, predictions, loss
+    return rnn_states, predictions, dec_inputs, embeddings, loss, num_correct
 end
 
-local function backward(x, seq_len, rnn_states, predictions)
+local function backward(x, seq_len, rnn_states, dec_inputs, embeddings, predictions)
     local d_state = Utils.spliceList(rnn_states[#rnn_states], 1, #init_state, true)   
 
     -- Backward pass over output sequence.
     local sep_index = seq_len + 1
     for t = seq_len, 0, -1 do
         local y = t == seq_len and Task.endToken(opt) or Task.copy(x, t + 1)
-        local d_loss = clones.criterion[t + sep_index]:backward(predictions[t], y)
+        local d_loss = clones.criterion[t]:backward(predictions[t], y)
         table.insert(d_state, d_loss)
-        local inp = t == 0 and Task.sepToken(opt) or Task.copy(x, t)
         local d_timestep = clones.rnn[t + sep_index]:backward(
-            {inp, unpack(rnn_states[t + sep_index])}, d_state) 
+            { embeddings[t + sep_index], unpack(rnn_states[t + sep_index]) }, d_state) 
+        clones.dec_dict[t]:backward(dec_inputs[t], d_timestep[1])
         d_state = Utils.spliceList(d_timestep, 2, #d_timestep)
     end
 
@@ -95,9 +133,10 @@ local function backward(x, seq_len, rnn_states, predictions)
     local zero_crit = Utils.gpu(torch.zeros(predictions[1]:size()))
     for t = seq_len, 0, -1 do
         table.insert(d_state, zero_crit)
-        local inp = t == 0 and Task.startToken(opt) or x[{{}, t}]
         local d_timestep = clones.rnn[t]:backward(
-            {inp, unpack(rnn_states[t])}, d_state) 
+            { embeddings[t], unpack(rnn_states[t]) }, d_state) 
+        local inp = t == 0 and Task.startToken(opt) or x:select(2, t)
+        clones.enc_dict[t]:backward(inp, d_timestep[1])
         d_state = Utils.spliceList(d_timestep, 2, #d_timestep)
     end 
 end
@@ -110,8 +149,8 @@ local function feval(paramsx)
 
     local x, seq_len = Task.generateSequence(false, false, opt)
     x = Utils.gpu(x, opt)
-    local rnn_states, predictions, loss = forward(x, seq_len) 
-    backward(x, seq_len, rnn_states, predictions)
+    local rnn_states, predictions, dec_inputs, embeddings, loss = forward(x, seq_len, true) 
+    backward(x, seq_len, rnn_states, dec_inputs, embeddings, predictions)
 
     local grad_norm = grad_params:norm()
     if grad_norm > opt.max_grad_norm then

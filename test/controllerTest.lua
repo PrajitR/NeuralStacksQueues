@@ -9,6 +9,7 @@ local opt = {
     num_memory_modules = 3,
     vocab_size = 5,
     rnn_size = 3,
+    embedding_size = 3,
     memory_size = 2,
     batch_size = 2,
     memory_types = "sqs" }
@@ -19,7 +20,7 @@ function tests.testOneSidedMemory()
     local rnn2 = Controller.oneSidedMemory(opt)
 
     local inputs1 = {}
-    local x = torch.rand(opt.batch_size):mul(opt.vocab_size):add(1):floor()
+    local x = torch.rand(opt.batch_size, opt.embedding_size)
     table.insert(inputs1, x)
     for i = 1, opt.num_lstm_layers do
         table.insert(inputs1, torch.rand(opt.batch_size, opt.rnn_size))
@@ -80,7 +81,7 @@ function tests.testDeQue()
     local rnn2 = Controller.DeQue(opt)
 
     local inputs1 = {}
-    x = torch.rand(opt.batch_size):mul(opt.vocab_size):add(1):floor()
+    x = torch.rand(opt.batch_size, opt.embedding_size)
     table.insert(inputs1, x)
     for i = 1, opt.num_lstm_layers do
         table.insert(inputs1, torch.rand(opt.batch_size, opt.rnn_size))
