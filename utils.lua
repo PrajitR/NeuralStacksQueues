@@ -167,7 +167,17 @@ function Utils.spliceList(src, first, last, should_zero)
 end
 
 function Utils.gpu(x, opt)
-    return x
+    if opt.gpuid >= 0 and opt.opencl == 0 then
+        if x:type() == 'torch.IntTensor' then
+            return x:float():cuda()
+        else
+            return x:cuda()
+        end
+    else if opt.gpuid >= and opt.opencl == 1 then
+        return x:cl()
+    else
+        return x
+    end
 end
 
 return Utils
